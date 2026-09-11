@@ -1,0 +1,14 @@
+========================================================================
+SMOTE AUGMENTATION TEST  |  1495 scenarios, 149 conflicts
+SMOTE applied inside training folds only. Conflict-class metrics.
+========================================================================
+
+### STRATIFIED (within-project) ###
+setting                     P      R     F1  PR-AUC
+baseline (class-weight)  0.582  0.617  0.599   0.611
++ SMOTE augmentation    0.589  0.711  0.644   0.606
+
+### LEAVE-REPO-OUT (cross-project) ###
+setting                     P      R     F1  PR-AUC
+baseline (class-weight)  0.626  0.584  0.604   0.616
++ SMOTE augmentation    0.618  0.718  0.665   0.633

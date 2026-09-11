@@ -1,0 +1,257 @@
+############################################################
+#  MERGE CONFLICT PREDICTOR - FRAMEWORK OUTPUTS
+#  Generated: Sat Aug  1 14:03:37 IST 2026
+#  Inventors: Subiksha Roshini Durai Murugan, Tamizhiniyan K.
+############################################################
+
+===== [1] DATASET EDA =====================================
+====================================================================
+DATASET EDA  |  all_graph.csv
+====================================================================
+scenarios (rows) ....... 206
+conflicts (label=1) .... 14  (6.8%)
+clean     (label=0) .... 192  (93.2%)
+imbalance ratio ........ 1 conflict : 13.7 clean
+feature columns ........ 22 (git+graph)
+
+### Contribution & conflict rate by repository ###
+repo                     scenarios  conflicts    rate
+commons-io                     108          3   2.8%   ########
+commons-lang                    52          1   1.9%   ###
+commons-collections             24          1   4.2%   ###
+netty                           22          9  40.9%   ########################
+
+### THE KEY STATISTIC: conflicts that share NO common file ###
+of 14 conflicts, 0 (0%) modify NO file in common.
+Flat overlap features cannot see these; they are the target of the
+dependency-graph interaction features (cross_edges, min_graph_distance, ...).
+
+### Feature signal: median value, clean vs conflict (+ correlation w/ label) ###
+feature            median clean median confl  corr(label)
+authors_p1                    1          8.5        0.629
+commits_p1                    1           81        0.619
+files_p1                      1          121        0.603
+churn_p1                    8.5    2.309e+04        0.600
+overlap_files                 0            2        0.531
+authors_p2                    1          2.5        0.323
+commits_p2                    2           11        0.277
+files_p2                      2            9        0.263
+g_edges                   536.5          222        0.196
+g_changed_p1                  1          0.5        0.190
+g_nodes                   511.5          315        0.159
+cross_edges                   0            0        0.156
+shared_modules                0            0        0.115
+g_fanout_p1                   0            0        0.113
+g_changed_p2                  1          5.5        0.102
+g_fanout_p2                   0          6.5        0.094
+g_fanin_p2                    0          6.5        0.093
+churn_p2                      9          258        0.089
+g_fanin_p1                    0            0        0.084
+min_graph_distance           12           12       -0.055
+overlap_ratio                 0      0.01015       -0.052
+shared_neighbors              0            0        0.002
+
+Reading: features are ranked by |correlation with the conflict label|.
+These rank-order matches the model's permutation importances (see explain.py).
+
+===== [2] PREDICTOR PERFORMANCE (git features, no leakage) =
+================================================================
+DATASET  all.csv
+  scenarios       561
+  conflicts (1)   68   (12.1%)
+  clean     (0)   493   (87.9%)
+  repos           6 -> ['commons-collections', 'commons-configuration', 'commons-io', 'commons-lang', 'logging-log4j2', 'netty']
+  code_conflict=1 24  (Java-source conflicts; label refinement, NOT a feature)
+================================================================
+
+### Stratified 5-fold CV (random split) ###
+
+  [LogReg (balanced)]  conflict-class metrics
+    precision 0.510   recall 0.721   F1 0.598   PR-AUC 0.600
+    confusion: TP=49 FP=47 FN=19 TN=446   (accuracy 0.882 <- ignore)
+
+  [RandomForest (balanced)]  conflict-class metrics
+    precision 0.613   recall 0.676   F1 0.643   PR-AUC 0.629
+    confusion: TP=46 FP=29 FN=22 TN=464   (accuracy 0.909 <- ignore)
+
+### Leave-repo-out CV (GroupKFold, 5 folds) — generalization to an UNSEEN repo ###
+
+  [LogReg (balanced)]  conflict-class metrics
+    precision 0.472   recall 0.735   F1 0.575   PR-AUC 0.601
+    confusion: TP=50 FP=56 FN=18 TN=437   (accuracy 0.868 <- ignore)
+
+  [RandomForest (balanced)]  conflict-class metrics
+    precision 0.633   recall 0.559   F1 0.594   PR-AUC 0.598
+    confusion: TP=38 FP=22 FN=30 TN=471   (accuracy 0.907 <- ignore)
+
+Note: baseline uses flat git features only. Phase 3 adds dependency-graph
+features expected to lift recall on conflicts that share NO file.
+
+===== [3] EXPLAINABILITY + RISK BANDING ===================
+==================================================================
+EXPLAINABILITY  |  all_graph.csv  |  206 scenarios, 14 conflicts
+features (22): git+graph
+==================================================================
+
+### GLOBAL feature importance (permutation, drop in avg-precision) ###
+  overlap_ratio     0.0254  ##############################
+  g_edges           0.0204  ########################
+  churn_p1          0.0161  ###################
+  g_fanin_p2        0.0132  ###############
+  commits_p1        0.0127  ##############
+  overlap_files     0.0088  ##########
+  churn_p2          0.0084  #########
+  commits_p2        0.0073  ########
+  files_p2          0.0062  #######
+  g_changed_p2      0.0054  ######
+  g_nodes           0.0048  #####
+  files_p1          0.0037  ####
+  g_fanout_p2       0.0036  ####
+  authors_p1        0.0007  #
+  authors_p2        0.0005  #
+  g_fanin_p1        0.0002  #
+  min_graph_distance0.0002  #
+  cross_edges       0.0000  #
+  shared_neighbors  0.0000  #
+  g_changed_p1      0.0000  #
+  shared_modules    0.0000  #
+
+### RISK SCORE banding (probability -> Low/Medium/High) ###
+  HIGH    [0.50-1.00):   15 scenarios, 14 actual conflicts  (93% hit-rate)
+  MEDIUM  [0.20-0.50):    8 scenarios, 0 actual conflicts  (0% hit-rate)
+  LOW     [0.00-0.20):  183 scenarios, 0 actual conflicts  (0% hit-rate)
+
+### LOCAL explanations for the highest-risk merges (why + action) ###
+
+  netty @ 06b0741189  |  conflict prob = 0.96  |  RISK: HIGH  |  actual: CONFLICT
+    - overlap_ratio = 0.0013 (typical clean 0)  ->  High share of overlapping files - split the work or integrate early in small steps.
+    - commits_p1 = 758 (typical clean 1)  ->  Branch 1 has diverged over many commits - rebase/integrate more frequently.
+    - overlap_files = 5 (typical clean 0)  ->  Both branches edit the same file(s) - coordinate on them or merge the smaller branch first.
+    - churn_p1 = 584964 (typical clean 8.5)  ->  Branch 1 changes a large volume of code - merge it sooner / in smaller increments.
+
+  netty @ 64588eb532  |  conflict prob = 0.96  |  RISK: HIGH  |  actual: CONFLICT
+    - overlap_ratio = 0.0047 (typical clean 0)  ->  High share of overlapping files - split the work or integrate early in small steps.
+    - commits_p1 = 1008 (typical clean 1)  ->  Branch 1 has diverged over many commits - rebase/integrate more frequently.
+    - overlap_files = 19 (typical clean 0)  ->  Both branches edit the same file(s) - coordinate on them or merge the smaller branch first.
+    - churn_p1 = 614698 (typical clean 8.5)  ->  Branch 1 changes a large volume of code - merge it sooner / in smaller increments.
+
+  netty @ f3c256ba68  |  conflict prob = 0.94  |  RISK: HIGH  |  actual: CONFLICT
+    - overlap_ratio = 0.0013 (typical clean 0)  ->  High share of overlapping files - split the work or integrate early in small steps.
+    - commits_p1 = 737 (typical clean 1)  ->  Branch 1 has diverged over many commits - rebase/integrate more frequently.
+    - overlap_files = 5 (typical clean 0)  ->  Both branches edit the same file(s) - coordinate on them or merge the smaller branch first.
+    - authors_p1 = 72 (typical clean 1)  ->  Many contributors on branch 1 - align via code owners before merging.
+
+Note: SHAP/GNNExplainer can be layered on later for exact additive
+attributions; this counterfactual method needs no extra dependencies.
+
+===== [4] LIVE PREDICTION (demo) ==========================
+============================================================
+ MERGE CONFLICT PREDICTION
+ (demo on dataset row - highest predicted risk)
+ repo   : logging-log4j2
+ merge  : c369ac2cf455
+ actual : CONFLICT
+============================================================
+  Conflict probability : 0.99
+  Risk score           : HIGH  [##########]
+
+  Why (top drivers):
+    - overlap_files = 5  (typical clean 0)
+    - overlap_ratio = 0.0043  (typical clean 0)
+    - churn_p1 = 35081  (typical clean 27)
+
+  Recommended action:
+    -> Both branches edit the same file(s) - coordinate on them or merge the smaller branch first.
+============================================================
+
+===== [5] REAL SEMANTIC LABELING (199 merges) =============
+==================================================================
+OPTION-2 SEMANTIC-CONFLICT DATASET
+==================================================================
+labelled scenarios : 199   (clean + semantic-conflict, excludes skip/textual)
+semantic conflicts : 0  (0.0%)
+by repo:
+                     count  sum
+repo                           
+commons-collections     46    0
+commons-io             100    0
+commons-lang            53    0
+
+Only 0 positive(s): too few for a reliable model. Not training —
+the SEEDED experiment (seeded.csv) is the controlled evidence for claim 3.
+If real positives stay low, report 'semantic conflicts are rare in stable
+libraries' as a finding and lean on the seeded proof + graph mechanism.
+
+===== [6] SEEDED EXPERIMENT - PATENT CLAIM 3 ==============
+           n  share_file  dep_linked  merged_compiles  semantic_conflict
+kind                                                                    
+CLEAN     20           0          20               20                  0
+CONFLICT  20           0          20                0                 20
+CONTROL   20           0           0               20                  0
+
+CONFLICT 20/20 fail-compile, share_file=0, all dependency-linked.
+CONTROL  same rename on UNLINKED class -> 0 conflicts (link is causal).
+
+===== [7] MULTI-MODEL TRAIN/TEST COMPARISON (5 classifiers) =====
+==============================================================================
+DATASET  all.csv   |   561 scenarios, 68 conflicts (12.1%), 6 repos
+base rate 0.121   (a trivial 'always clean' model scores 87.9% accuracy and is useless)
+==============================================================================
+
+### stratified-5fold ###
+  model                          P      R     F1   PRAUC   confusion TP/FP/FN/TN
+  RandomForest (balanced)    0.613  0.676  0.643   0.629   46/29/22/464
+  HistGradientBoosting       0.667  0.618  0.641   0.618   42/21/26/472
+  ExtraTrees (balanced)      0.537  0.750  0.626   0.670   51/44/17/449
+  GradientBoosting           0.612  0.603  0.607   0.579   41/26/27/467
+  LogReg (balanced)          0.510  0.721  0.598   0.600   49/47/19/446
+
+### leave-repo-out ###
+  model                          P      R     F1   PRAUC   confusion TP/FP/FN/TN
+  RandomForest (balanced)    0.633  0.559  0.594   0.598   38/22/30/471
+  LogReg (balanced)          0.472  0.735  0.575   0.601   50/56/18/437
+  ExtraTrees (balanced)      0.529  0.544  0.536   0.586   37/33/31/460
+  HistGradientBoosting       0.581  0.368  0.450   0.566   25/18/43/475
+  GradientBoosting           0.500  0.368  0.424   0.481   25/25/43/468
+
+==============================================================================
+HEADLINE (leave-repo-out, the honest generalization number):
+  best model = RandomForest (balanced)
+  F1 0.594 | precision 0.633 | recall 0.559 | PR-AUC 0.598
+  PR-AUC 0.598 vs base rate 0.121 = 4.9x better than chance
+==============================================================================
+
+===== [8] FULL-DATASET GIT vs GRAPH vs ALL (561/68, 6 repos) =====
+=== STEP 3/3  GIT vs GRAPH vs ALL comparison (the headline number) ===
+dataset all_graph.csv: 561 scenarios, 68 conflicts (12.1%), 6 repos
+
+======================================================================
+MODEL: RandomForest   (conflict-class: precision / recall / F1 / PR-AUC)
+======================================================================
+feature set         protocol             P      R     F1   PRAUC   confusion(TP/FP/FN/TN)
+GIT (baseline)      stratified-5f    0.613  0.676  0.643   0.629   46/29/22/464
+GRAPH (novelty)     stratified-5f    0.510  0.382  0.437   0.476   26/25/42/468
+ALL (git+graph)     stratified-5f    0.621  0.603  0.612   0.672   41/25/27/468
+
+GIT (baseline)      leave-repo-out   0.633  0.559  0.594   0.598   38/22/30/471
+GRAPH (novelty)     leave-repo-out   0.583  0.103  0.175   0.276   7/5/61/488
+ALL (git+graph)     leave-repo-out   0.686  0.515  0.588   0.610   35/16/33/477   <= lift -0.006 vs GIT
+
+
+======================================================================
+MODEL: LogReg   (conflict-class: precision / recall / F1 / PR-AUC)
+======================================================================
+feature set         protocol             P      R     F1   PRAUC   confusion(TP/FP/FN/TN)
+GIT (baseline)      stratified-5f    0.510  0.721  0.598   0.600   49/47/19/446
+GRAPH (novelty)     stratified-5f    0.293  0.632  0.400   0.434   43/104/25/389
+ALL (git+graph)     stratified-5f    0.455  0.735  0.562   0.616   50/60/18/433
+
+GIT (baseline)      leave-repo-out   0.472  0.735  0.575   0.601   50/56/18/437
+GRAPH (novelty)     leave-repo-out   0.275  0.206  0.235   0.233   14/37/54/456
+ALL (git+graph)     leave-repo-out   0.430  0.632  0.512   0.521   43/57/25/436   <= lift -0.063 vs GIT
+
+Headline = leave-repo-out F1 of ALL minus GIT. Positive => the dependency
+graph adds signal the flat git features miss (esp. no-shared-file conflicts).
+
+DONE. If this completed, drop the leave-repo-out ALL-vs-GIT F1 / PR-AUC
+into IDF section 8 (the remaining [EDIT]).

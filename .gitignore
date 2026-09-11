@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data - keep CSVs but ignore large/intermediate files
+Software_metrics/repos/
+Software_metrics/output/intermediate/
+*.pkl
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
