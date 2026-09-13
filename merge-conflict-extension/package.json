@@ -1,0 +1,78 @@
+{
+  "name": "merge-conflict-predictor",
+  "displayName": "Merge Conflict Predictor",
+  "description": "AI-powered merge conflict prediction for Git repositories",
+  "version": "1.0.0",
+  "publisher": "subiksharoshini28",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mergeConflictPredictor.predict",
+        "title": "Predict Merge Conflict"
+      },
+      {
+        "command": "mergeConflictPredictor.checkCurrent",
+        "title": "Check Current Branch Conflict Risk"
+      },
+      {
+        "command": "mergeConflictPredictor.showPanel",
+        "title": "Show Conflict Predictor Panel"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "merge-conflict-predictor",
+          "title": "Conflict Predictor",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "merge-conflict-predictor": [
+        {
+          "type": "webview",
+          "id": "mergeConflictPredictor.panel",
+          "name": "Conflict Predictor"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Merge Conflict Predictor",
+      "properties": {
+        "mergeConflictPredictor.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:5000",
+          "description": "URL of the prediction server"
+        },
+        "mergeConflictPredictor.autoCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically check conflict risk on branch switch"
+        },
+        "mergeConflictPredictor.riskThreshold": {
+          "type": "number",
+          "default": 0.5,
+          "description": "Probability threshold for HIGH risk warning"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "eslint": "^8.0.0"
+  },
+  "dependencies": {}
+}
