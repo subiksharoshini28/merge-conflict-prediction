@@ -1,0 +1,46 @@
+@'
+# Merge Conflict Predictor - Project Context
+
+## Goal
+Predict whether two git branches will produce a merge conflict BEFORE merging.
+Output: conflict probability + explanation (why) + recommended action.
+Target: an IEEE conference paper. Novelty = dependency-graph + graph-learning +
+explainable AI on top of conflict prediction (prior work uses flat git features only).
+
+## Where things are
+- mine_conflicts.py : Phase 0 dataset engine (WORKS - do not rewrite the core logic)
+- all.csv           : mined labeled dataset
+- D:\<repo folders> : shallow clones used as data sources (commons-lang, netty, ...)
+
+## What mine_conflicts.py already does
+For each 2-parent merge in a repo it:
+- computes the merge base of the two parents
+- LABELS by replaying: git merge-tree --write-tree p1 p2
+  (exit 0 = clean -> 0 ; exit 1 = conflict -> 1 ; parses conflicted files)
+- extracts git-history features: commits_p1/p2, files_p1/p2, overlap_files,
+  overlap_ratio, authors_p1/p2, churn_p1/p2 ; writes one CSV row, label last
+
+## Phased plan
+Phase 0 (current): build the dataset. Target 500+ scenarios, 50+ conflicts.
+Phase 2: baseline model on the git features. HANDLE IMBALANCE (class weights or
+  undersampling). Judge on PRECISION/RECALL/F1 for the conflict class - NEVER
+  accuracy (a predict-clean model scores 90%+ and is useless).
+Phase 3 (novelty): dependency-graph features. Build a file-level import graph at the
+  merge base, then per scenario compute fan-in/out, centrality, dep depth, and the
+  interaction features that catch conflicts with NO shared file: cross_edges,
+  min_graph_distance, shared_neighbors, shared_modules.
+Phase 4: explainability - SHAP for tabular, GNNExplainer for the graph model.
+
+## Hard rules
+- Point-in-time: compute every feature at the MERGE BASE commit. Read file content
+  with git show <base>:<path>. Never checkout or mutate the working tree.
+- NO leakage: historical features (past conflict rate, change coupling) may only use
+  commits dated BEFORE the current scenario. Wrong here silently inflates results.
+- Pick ONE language for graph/complexity analysis (Java - matches the repos).
+- Class imbalance is expected; keep all rows in the miner, balance at train time.
+- Single-file deliverables where reasonable. Complete files, no diffs, no changelogs.
+
+## Data-cleaning decisions
+- Drop trivial merges where commits_p1 == 0 OR commits_p2 == 0 (one side never diverged).
+- Add code_conflict flag: 1 if a conflicted file is a Java source file, else 0.
+'@ | Set-Content -Path D:\conflict-predictor\CLAUDE.md -Encoding ascii

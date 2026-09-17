@@ -1,171 +1,105 @@
 """
-Feature Extraction - Extract git-history features from repositories.
+Feature Extraction — transform the original features into new, derived ones
+(dimensionality reduction). Covers the syllabus methods on the real dataset.
 
-Usage:  python feature_extraction.py [repo1] [repo2] ...
-        python feature_extraction.py --all
-Output: features_extracted.csv
+  PCA        linear, unsupervised (max variance)
+  LDA        linear, supervised (max class separability)
+  t-SNE      nonlinear, for 2-D visualisation
+  KernelPCA  nonlinear PCA (RBF kernel)
+  ICA        independent components
+
+Produces a 2-D visualisation (feature_extraction.png), saves the PCA-reduced data
+(features_extracted.csv), and HONESTLY reports whether reduction helps the Random
+Forest (F1, stratified 5-fold) versus the original features.
+
+No downloads — sklearn/matplotlib only (UMAP/autoencoder omitted as they need extra libs).
+Usage:  python feature_extraction.py [all.csv]
 """
-import os
 import sys
-import warnings
-import subprocess
-import csv
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA, KernelPCA, FastICA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.manifold import TSNE
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_predict, StratifiedKFold
+from sklearn.metrics import f1_score
 
-warnings.filterwarnings("ignore")
-
-DIVIDER = "=" * 80
-
-
-def g(repo, *a):
-    return subprocess.run(
-        ["git", "-C", repo, *a],
-        capture_output=True, text=True
-    ).stdout.strip()
-
-
-def extract_branch_features(repo, base, tip):
-    commits = int(g(repo, "rev-list", "--count", base + ".." + tip) or 0)
-    files = set(g(repo, "diff", "--name-only", base, tip).splitlines())
-    authors = len(set(g(repo, "log", "--format=%ae", base + ".." + tip).splitlines()))
-    stat = g(repo, "diff", "--shortstat", base, tip)
-    ins = dels = 0
-    for part in stat.split(", "):
-        if "insertion" in part:
-            ins = int(part.split()[0])
-        elif "deletion" in part:
-            dels = int(part.split()[0])
-    return commits, files, authors, ins + dels
+FEATURES = ["commits_p1", "commits_p2", "files_p1", "files_p2", "overlap_files",
+            "overlap_ratio", "authors_p1", "authors_p2", "churn_p1", "churn_p2"]
 
 
-def extract_merge_features(repo, merge_commit, repo_name):
-    parents = g(repo, "rev-list", "--parents", "-n", "1", merge_commit).split()[1:]
-    if len(parents) != 2:
-        return None
-    p1, p2 = parents
-    base = g(repo, "merge-base", p1, p2)
-    if not base:
-        return None
-
-    result = subprocess.run(
-        ["git", "-C", repo, "merge-tree", "--write-tree", p1, p2],
-        capture_output=True, text=True
-    )
-    if result.returncode not in (0, 1):
-        return None
-    label = 1 if result.returncode == 1 else 0
-
-    conflict_files = [
-        line.split("Merge conflict in ", 1)[1]
-        for line in result.stdout.splitlines()
-        if "Merge conflict in " in line
-    ]
-    code_conflict = 1 if any(f.strip().endswith(".java") for f in conflict_files) else 0
-
-    c1, f1, a1, ch1 = extract_branch_features(repo, base, p1)
-    c2, f2, a2, ch2 = extract_branch_features(repo, base, p2)
-
-    if c1 == 0 or c2 == 0:
-        return None
-
-    overlap = f1 & f2
-    union = f1 | f2
-    overlap_ratio = round(len(overlap) / len(union), 4) if union else 0
-
-    return {
-        "repo": repo_name,
-        "merge": merge_commit,
-        "commits_p1": c1,
-        "commits_p2": c2,
-        "files_p1": len(f1),
-        "files_p2": len(f2),
-        "overlap_files": len(overlap),
-        "overlap_ratio": overlap_ratio,
-        "authors_p1": a1,
-        "authors_p2": a2,
-        "churn_p1": ch1,
-        "churn_p2": ch2,
-        "conflict_files": ";".join(conflict_files),
-        "code_conflict": code_conflict,
-        "label": label
-    }
+def rf_f1(X, y):
+    m = RandomForestClassifier(n_estimators=300, class_weight="balanced_subsample",
+                               min_samples_leaf=2, random_state=0, n_jobs=-1)
+    skf = StratifiedKFold(5, shuffle=True, random_state=0)
+    pred = cross_val_predict(m, X, y, cv=skf, method="predict")
+    return f1_score(y, pred, zero_division=0)
 
 
 def main():
-    print(DIVIDER)
-    print("  FEATURE EXTRACTION - Git History Features")
-    print(DIVIDER)
+    path = sys.argv[1] if len(sys.argv) > 1 else "all.csv"
+    df = pd.read_csv(path)
+    df[FEATURES] = df[FEATURES].apply(pd.to_numeric, errors="coerce").fillna(0)
+    y = pd.to_numeric(df["label"], errors="coerce").fillna(0).astype(int).to_numpy()
+    X = StandardScaler().fit_transform(df[FEATURES].to_numpy(float))
+    print("=" * 72)
+    print(f"FEATURE EXTRACTION  |  {X.shape[0]} scenarios, {X.shape[1]} features -> reduced")
+    print("=" * 72)
 
-    args = sys.argv[1:]
-    if "--all" in args:
-        repos_dir = "repos"
-        if os.path.exists(repos_dir):
-            repos = [
-                os.path.join(repos_dir, d)
-                for d in os.listdir(repos_dir)
-                if os.path.isdir(os.path.join(repos_dir, d))
-            ]
-        else:
-            print("  Error: repos/ directory not found")
-            return
-    else:
-        repos = [r for r in args if r.startswith("repos/")]
+    # ---- PCA ----
+    pca = PCA().fit(X)
+    cum = np.cumsum(pca.explained_variance_ratio_)
+    k95 = int(np.argmax(cum >= 0.95) + 1)
+    print(f"\n[PCA] variance explained: PC1 {pca.explained_variance_ratio_[0]:.1%}, "
+          f"PC1-2 {cum[1]:.1%}; {k95} components reach 95%")
+    Xp2 = PCA(n_components=2, random_state=0).fit_transform(X)
+    Xp5 = PCA(n_components=5, random_state=0).fit_transform(X)
 
-    if not repos:
-        print("\n  Usage:")
-        print("    python feature_extraction.py repos/commons-lang repos/commons-io")
-        print("    python feature_extraction.py --all")
-        return
+    # ---- LDA (supervised, 1 component for binary) ----
+    Xl = LDA(n_components=1).fit_transform(X, y)
+    print(f"[LDA] projected to 1 supervised component (class-separating)")
 
-    print(f"\n  Repos to mine: {len(repos)}")
-    for r in repos:
-        print(f"    - {r}")
+    # ---- t-SNE (visualisation) ----
+    print("[t-SNE] computing 2-D embedding (this takes a moment)...")
+    Xt = TSNE(n_components=2, init="pca", perplexity=30, random_state=0).fit_transform(X)
 
-    output_file = "features_extracted.csv"
-    fieldnames = [
-        "repo", "merge", "commits_p1", "commits_p2", "files_p1", "files_p2",
-        "overlap_files", "overlap_ratio", "authors_p1", "authors_p2",
-        "churn_p1", "churn_p2", "conflict_files", "code_conflict", "label"
-    ]
+    # ---- KernelPCA + ICA ----
+    Xk = KernelPCA(n_components=2, kernel="rbf", gamma=0.1, random_state=0).fit_transform(X)
+    Xi = FastICA(n_components=2, random_state=0, max_iter=500).fit_transform(X)
 
-    total_scenarios = 0
-    total_conflicts = 0
+    # ---- honest effect on the model ----
+    print("\n[EFFECT ON MODEL] Random Forest F1 (stratified 5-fold, conflict class)")
+    base = rf_f1(X, y)
+    print(f"   original 10 features        F1 = {base:.3f}")
+    print(f"   PCA (5 components)          F1 = {rf_f1(Xp5, y):.3f}")
+    print(f"   LDA (1 component)           F1 = {rf_f1(Xl, y):.3f}")
+    print("   (For tree models, PCA usually does NOT beat the original interpretable")
+    print("    features; extraction is used here mainly for visualisation.)")
 
-    with open(output_file, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
+    # ---- save PCA-reduced dataset ----
+    out = df[["repo", "merge"]].copy()
+    for i in range(5):
+        out[f"pca_{i+1}"] = Xp5[:, i]
+    out["lda_1"] = Xl[:, 0]; out["label"] = y
+    out.to_csv("features_extracted.csv", index=False)
 
-        for repo_path in repos:
-            repo_name = os.path.basename(repo_path.rstrip("/\\"))
-            print(f"\n  [{repo_name}] Mining merges...")
-
-            merges = g(repo_path, "log", "--merges", "--format=%H").splitlines()
-            print(f"    Found {len(merges)} merge commits")
-
-            repo_scenarios = 0
-            repo_conflicts = 0
-
-            for merge_commit in merges:
-                features = extract_merge_features(repo_path, merge_commit, repo_name)
-                if features:
-                    writer.writerow(features)
-                    repo_scenarios += 1
-                    if features["label"] == 1:
-                        repo_conflicts += 1
-
-            total_scenarios += repo_scenarios
-            total_conflicts += repo_conflicts
-            print(f"    Extracted: {repo_scenarios} scenarios, {repo_conflicts} conflicts")
-
-    print(f"\n{'-' * 80}")
-    print("  EXTRACTION COMPLETE")
-    print(f"{'-' * 80}")
-    print(f"  Output file      : {output_file}")
-    print(f"  Total scenarios  : {total_scenarios}")
-    print(f"  Total conflicts  : {total_conflicts}")
-    if total_scenarios > 0:
-        print(f"  Conflict rate    : {total_conflicts/total_scenarios*100:.1f}%")
-    print(f"  Features per row : 10")
-    print(DIVIDER)
+    # ---- visualisation ----
+    fig, ax = plt.subplots(1, 3, figsize=(13, 4.2))
+    for A, XX, title in [(ax[0], Xp2, "PCA (2 components)"),
+                         (ax[2], Xt, "t-SNE (2-D)")]:
+        A.scatter(XX[y == 0, 0], XX[y == 0, 1], s=8, c="#9aa0a6", label="clean", alpha=.6)
+        A.scatter(XX[y == 1, 0], XX[y == 1, 1], s=14, c="#d63b3b", label="conflict", alpha=.8)
+        A.set_title(title); A.legend(fontsize=8)
+    ax[1].hist(Xl[y == 0, 0], bins=40, color="#9aa0a6", alpha=.7, label="clean")
+    ax[1].hist(Xl[y == 1, 0], bins=40, color="#d63b3b", alpha=.7, label="conflict")
+    ax[1].set_title("LDA (1 supervised component)"); ax[1].legend(fontsize=8)
+    plt.tight_layout(); plt.savefig("feature_extraction.png", dpi=130)
+    print("\nSaved: features_extracted.csv, feature_extraction.png")
 
 
 if __name__ == "__main__":

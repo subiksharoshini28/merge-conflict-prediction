@@ -17,11 +17,15 @@ from urllib.parse import urlparse, parse_qs
 
 warnings.filterwarnings("ignore")
 
-# Load the trained model
+# Locate the project folder (parent of this extension) so the predictor and model
+# resolve no matter where the server is launched from.
+_PROJ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJ not in sys.path:
+    sys.path.insert(0, _PROJ)
 import pickle
 import conflict_predictor as cp
 
-MODEL_PATH = "model.pkl"
+MODEL_PATH = os.path.join(_PROJ, "model.pkl")
 GIT = cp.FEATURES
 
 
@@ -49,9 +53,10 @@ class PredictionHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Handle GET requests."""
-        if self.path == "/health":
+        route = urlparse(self.path).path   # strip the ?query so matching works
+        if route == "/health":
             self.handle_health()
-        elif self.path == "/features":
+        elif route == "/features":
             self.handle_get_features()
         else:
             self.send_error(404, "Not Found")

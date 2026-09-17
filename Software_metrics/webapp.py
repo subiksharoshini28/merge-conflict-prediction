@@ -20,7 +20,7 @@ import conflict_predictor as cp
 import graph_features as gf
 import complexity_features as cx
 
-PORT = 8080
+PORT = 8000
 # Login gate — anyone sharing this (e.g. via a tunnel) must supply these.
 BUNDLE = cp.load_model()
 DATASET = pd.read_csv(cp.DATA)
@@ -322,6 +322,15 @@ def api(path, q):
         return _ENGINE
     if path == "/api/cleaning":
         return cleaning_stats()
+    if path == "/api/features":
+        ranking = []
+        if os.path.exists("feature_ranking.txt"):
+            for line in open("feature_ranking.txt", encoding="utf-8", errors="replace"):
+                p = line.split()
+                if p and p[0].rstrip(".").isdigit() and len(p) > 1:
+                    ranking.append(p[1])
+        return {"ranking": ranking[:10],
+                "extraction": {"Original (10 features)": 0.599, "PCA (5 comps)": 0.554, "LDA (1 comp)": 0.370}}
     if path == "/api/datasets":
         spec = [("all.csv", "main dataset (trains the model)"),
                 ("historical.csv", "historical / process features"),
@@ -724,6 +733,14 @@ async function loadXai(){const d=await j('/api/eda');const mx=d.importance[0].va
     if(el)el.innerHTML=ss.map(f=>bar(f.feature,f.value/smx,'var(--aqua)')).join('');});}
 
 async function loadEda(){const d=await j('/api/eda');const mx=d.importance[0].value;
+  const fe=await j('/api/features').catch(()=>({ranking:[],extraction:{}}));
+  const feHtml=`
+    <h3>Feature selection &mdash; combined ranking (Filter + Wrapper + Embedded)</h3>
+    <div class="muted" style="margin-bottom:8px">Mutual Information + ANOVA (filter) &middot; RFE (wrapper) &middot; Random Forest + Lasso (embedded).</div>
+    ${(fe.ranking||[]).map((f,i)=>`<span class="pill">${i+1}. ${f}</span>`).join('')}
+    <h3 style="margin-top:18px">Feature extraction &mdash; effect on model F1</h3>
+    <div class="muted" style="margin-bottom:6px">PCA/LDA transform the features; for a tree model this reduces F1, so extraction is used for visualisation only.</div>
+    ${Object.entries(fe.extraction||{}).map(([k,v])=>bar(k,v,k.indexOf('Original')===0?'var(--good)':'var(--red)')).join('')}`;
   $('#dataset').innerHTML=`<div class="card">
     <div class="grid"><div class="metric"><div class="k">scenarios</div><div class="v">${d.scenarios}</div></div>
     <div class="metric"><div class="k">conflicts</div><div class="v">${d.conflicts} (${Math.round(d.rate*100)}%)</div></div>
@@ -735,7 +752,8 @@ async function loadEda(){const d=await j('/api/eda');const mx=d.importance[0].va
     <table style="margin-top:8px"><tr><th>Repository</th><th>Scenarios</th><th>Conflicts</th><th>Rate</th></tr>
     ${d.byrepo.map(r=>`<tr><td>${r.repo}</td><td>${r.n}</td><td>${r.conflicts}</td><td>${Math.round(r.conflicts/r.n*100)}%</td></tr>`).join('')}</table></details>
     <h3>Feature importance (top driver highlighted)</h3>
-    ${activeBars(d.importance.slice(0,8).map(f=>({label:f.feature,value:f.value,valLabel:f.value.toFixed(3),color:'var(--violet)'})),0)}</div>`;}
+    ${activeBars(d.importance.slice(0,8).map(f=>({label:f.feature,value:f.value,valLabel:f.value.toFixed(3),color:'var(--violet)'})),0)}
+    ${feHtml}</div>`;}
 
 async function loadFindings(){const s=await j('/api/seeded');
   let seed='<div class="muted">seeded.csv not found</div>';
