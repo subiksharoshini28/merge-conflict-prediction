@@ -1,0 +1,61 @@
+kind,k,file_a,file_b,share_file,dependency_linked,merged_compiles,semantic_conflict,error
+CONFLICT,0,Provider_0.java,Consumer_0.java,0,1,0,1,cannot find symbol
+CONFLICT,1,Provider_1.java,Consumer_1.java,0,1,0,1,cannot find symbol
+CONFLICT,2,Provider_2.java,Consumer_2.java,0,1,0,1,cannot find symbol
+CONFLICT,3,Provider_3.java,Consumer_3.java,0,1,0,1,cannot find symbol
+CONFLICT,4,Provider_4.java,Consumer_4.java,0,1,0,1,cannot find symbol
+CONFLICT,5,Provider_5.java,Consumer_5.java,0,1,0,1,cannot find symbol
+CONFLICT,6,Provider_6.java,Consumer_6.java,0,1,0,1,cannot find symbol
+CONFLICT,7,Provider_7.java,Consumer_7.java,0,1,0,1,cannot find symbol
+CONFLICT,8,Provider_8.java,Consumer_8.java,0,1,0,1,cannot find symbol
+CONFLICT,9,Provider_9.java,Consumer_9.java,0,1,0,1,cannot find symbol
+CONFLICT,10,Provider_10.java,Consumer_10.java,0,1,0,1,cannot find symbol
+CONFLICT,11,Provider_11.java,Consumer_11.java,0,1,0,1,cannot find symbol
+CONFLICT,12,Provider_12.java,Consumer_12.java,0,1,0,1,cannot find symbol
+CONFLICT,13,Provider_13.java,Consumer_13.java,0,1,0,1,cannot find symbol
+CONFLICT,14,Provider_14.java,Consumer_14.java,0,1,0,1,cannot find symbol
+CONFLICT,15,Provider_15.java,Consumer_15.java,0,1,0,1,cannot find symbol
+CONFLICT,16,Provider_16.java,Consumer_16.java,0,1,0,1,cannot find symbol
+CONFLICT,17,Provider_17.java,Consumer_17.java,0,1,0,1,cannot find symbol
+CONFLICT,18,Provider_18.java,Consumer_18.java,0,1,0,1,cannot find symbol
+CONFLICT,19,Provider_19.java,Consumer_19.java,0,1,0,1,cannot find symbol
+CLEAN,0,Provider_0.java,Consumer_0.java,0,1,1,0,
+CLEAN,1,Provider_1.java,Consumer_1.java,0,1,1,0,
+CLEAN,2,Provider_2.java,Consumer_2.java,0,1,1,0,
+CLEAN,3,Provider_3.java,Consumer_3.java,0,1,1,0,
+CLEAN,4,Provider_4.java,Consumer_4.java,0,1,1,0,
+CLEAN,5,Provider_5.java,Consumer_5.java,0,1,1,0,
+CLEAN,6,Provider_6.java,Consumer_6.java,0,1,1,0,
+CLEAN,7,Provider_7.java,Consumer_7.java,0,1,1,0,
+CLEAN,8,Provider_8.java,Consumer_8.java,0,1,1,0,
+CLEAN,9,Provider_9.java,Consumer_9.java,0,1,1,0,
+CLEAN,10,Provider_10.java,Consumer_10.java,0,1,1,0,
+CLEAN,11,Provider_11.java,Consumer_11.java,0,1,1,0,
+CLEAN,12,Provider_12.java,Consumer_12.java,0,1,1,0,
+CLEAN,13,Provider_13.java,Consumer_13.java,0,1,1,0,
+CLEAN,14,Provider_14.java,Consumer_14.java,0,1,1,0,
+CLEAN,15,Provider_15.java,Consumer_15.java,0,1,1,0,
+CLEAN,16,Provider_16.java,Consumer_16.java,0,1,1,0,
+CLEAN,17,Provider_17.java,Consumer_17.java,0,1,1,0,
+CLEAN,18,Provider_18.java,Consumer_18.java,0,1,1,0,
+CLEAN,19,Provider_19.java,Consumer_19.java,0,1,1,0,
+CONTROL,0,Unrelated_0.java,Consumer_0.java,0,0,1,0,
+CONTROL,1,Unrelated_1.java,Consumer_1.java,0,0,1,0,
+CONTROL,2,Unrelated_2.java,Consumer_2.java,0,0,1,0,
+CONTROL,3,Unrelated_3.java,Consumer_3.java,0,0,1,0,
+CONTROL,4,Unrelated_4.java,Consumer_4.java,0,0,1,0,
+CONTROL,5,Unrelated_5.java,Consumer_5.java,0,0,1,0,
+CONTROL,6,Unrelated_6.java,Consumer_6.java,0,0,1,0,
+CONTROL,7,Unrelated_7.java,Consumer_7.java,0,0,1,0,
+CONTROL,8,Unrelated_8.java,Consumer_8.java,0,0,1,0,
+CONTROL,9,Unrelated_9.java,Consumer_9.java,0,0,1,0,
+CONTROL,10,Unrelated_10.java,Consumer_10.java,0,0,1,0,
+CONTROL,11,Unrelated_11.java,Consumer_11.java,0,0,1,0,
+CONTROL,12,Unrelated_12.java,Consumer_12.java,0,0,1,0,
+CONTROL,13,Unrelated_13.java,Consumer_13.java,0,0,1,0,
+CONTROL,14,Unrelated_14.java,Consumer_14.java,0,0,1,0,
+CONTROL,15,Unrelated_15.java,Consumer_15.java,0,0,1,0,
+CONTROL,16,Unrelated_16.java,Consumer_16.java,0,0,1,0,
+CONTROL,17,Unrelated_17.java,Consumer_17.java,0,0,1,0,
+CONTROL,18,Unrelated_18.java,Consumer_18.java,0,0,1,0,
+CONTROL,19,Unrelated_19.java,Consumer_19.java,0,0,1,0,
