@@ -1,0 +1,21 @@
+==================================================================================
+FULL EVALUATION  |  1495 scenarios, 149 conflicts, 18 repos
+feature groups available -> git:10  hist:5  complexity:6  graph:10
+==================================================================================
+
+### STRATIFIED 5-fold (within-project) ###
+feature set         P      R     F1  PR-AUC   TP/FP/FN
+GIT             0.582  0.617  0.599   0.611   92/66/57
+HIST only       0.425  0.248  0.314   0.306   37/50/112
+GIT+HIST        0.637  0.577  0.606   0.621   86/49/63
+ALL             0.627  0.597  0.612   0.619   89/53/60
+
+### LEAVE-ONE-REPO-OUT (cross-project) ###
+feature set         P      R     F1  PR-AUC   TP/FP/FN
+GIT             0.626  0.584  0.604   0.616   87/52/62
+HIST only       0.237  0.094  0.135   0.174   14/45/135
+GIT+HIST        0.657  0.450  0.534   0.585   67/35/82
+ALL             0.655  0.497  0.565   0.584   74/39/75
+
+Honest headline = LEAVE-REPO-OUT F1. Within-project (stratified) is legitimately higher
+and reflects a per-project CI-assistant use case — report both, labelled clearly.

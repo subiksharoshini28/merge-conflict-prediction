@@ -1,0 +1,13 @@
+FEATURE RANKING - Combined Methods
+============================================================
+
+1. churn_p2           - Lines added + deleted by branch 2
+2. churn_p1           - Lines added + deleted by branch 1
+3. overlap_files      - Files edited by BOTH branches
+4. commits_p2         - Number of commits branch 2 diverged by
+5. overlap_ratio      - Overlap as fraction of all touched files
+6. authors_p2         - Distinct authors on branch 2
+7. files_p2           - Number of files changed on branch 2
+8. authors_p1         - Distinct authors on branch 1
+9. files_p1           - Number of files changed on branch 1
+10. commits_p1         - Number of commits branch 1 diverged by

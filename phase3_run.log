@@ -1,0 +1,101 @@
+=== STEP 1/3  hydrate blobless clones (network-bound; resumable) ===
+[commons-lang] 52 merges -> 50 unique bases; objects=7M  hydrating in chunks of 20 ...
+    chunk 1/3 (ok)  objects=7M
+    chunk 2/3 (ok)  objects=7M
+    chunk 3/3 (ok)  objects=7M
+[commons-lang] done, objects=7M
+[netty] 22 merges -> 22 unique bases; objects=16M  hydrating in chunks of 20 ...
+    chunk 1/2 (ok)  objects=16M
+    chunk 2/2 (ok)  objects=16M
+[netty] done, objects=16M
+[commons-io] 108 merges -> 104 unique bases; objects=14M  hydrating in chunks of 20 ...
+    chunk 1/6 (ok)  objects=14M
+    chunk 2/6 (ok)  objects=14M
+    chunk 3/6 (ok)  objects=14M
+    chunk 4/6 (ok)  objects=14M
+    chunk 5/6 (ok)  objects=14M
+    chunk 6/6 (ok)  objects=14M
+[commons-io] done, objects=14M
+[commons-collections] 47 merges -> 45 unique bases; objects=15M  hydrating in chunks of 20 ...
+    chunk 1/3 (ok)  objects=15M
+    chunk 2/3 (ok)  objects=15M
+    chunk 3/3 (ok)  objects=15M
+[commons-collections] done, objects=15M
+[commons-configuration] 47 merges -> 47 unique bases; objects=12M  hydrating in chunks of 20 ...
+    chunk 1/3 (ok)  objects=13M
+    chunk 2/3 (ok)  objects=13M
+    chunk 3/3 (ok)  objects=13M
+[commons-configuration] done, objects=13M
+[logging-log4j2] 285 merges -> 250 unique bases; objects=67M  hydrating in chunks of 20 ...
+    chunk 1/13 (ok)  objects=67M
+    chunk 2/13 (ok)  objects=67M
+    chunk 3/13 (ok)  objects=67M
+    chunk 4/13 (ok)  objects=67M
+    chunk 5/13 (ok)  objects=67M
+    chunk 6/13 (ok)  objects=67M
+    chunk 7/13 (ok)  objects=67M
+    chunk 8/13 (ok)  objects=67M
+    chunk 9/13 (ok)  objects=67M
+    chunk 10/13 (ok)  objects=67M
+    chunk 11/13 (ok)  objects=67M
+    chunk 12/13 (ok)  objects=67M
+    chunk 13/13 (ok)  objects=67M
+[logging-log4j2] done, objects=67M
+HYDRATE FINISHED
+=== STEP 2/3  extract dependency-graph features (local, fast) ===
+  25/561 scenarios
+  50/561 scenarios
+  75/561 scenarios
+  100/561 scenarios
+  125/561 scenarios
+  150/561 scenarios
+  175/561 scenarios
+  200/561 scenarios
+  225/561 scenarios
+  250/561 scenarios
+  275/561 scenarios
+  300/561 scenarios
+  325/561 scenarios
+  350/561 scenarios
+  375/561 scenarios
+  400/561 scenarios
+  425/561 scenarios
+  450/561 scenarios
+  475/561 scenarios
+  500/561 scenarios
+  525/561 scenarios
+  550/561 scenarios
+DONE: wrote 561 rows with 12 graph features -> all_graph.csv
+=== STEP 3/3  GIT vs GRAPH vs ALL comparison (the headline number) ===
+dataset all_graph.csv: 561 scenarios, 68 conflicts (12.1%), 6 repos
+
+======================================================================
+MODEL: RandomForest   (conflict-class: precision / recall / F1 / PR-AUC)
+======================================================================
+feature set         protocol             P      R     F1   PRAUC   confusion(TP/FP/FN/TN)
+GIT (baseline)      stratified-5f    0.613  0.676  0.643   0.629   46/29/22/464
+GRAPH (novelty)     stratified-5f    0.510  0.382  0.437   0.476   26/25/42/468
+ALL (git+graph)     stratified-5f    0.621  0.603  0.612   0.672   41/25/27/468
+
+GIT (baseline)      leave-repo-out   0.633  0.559  0.594   0.598   38/22/30/471
+GRAPH (novelty)     leave-repo-out   0.583  0.103  0.175   0.276   7/5/61/488
+ALL (git+graph)     leave-repo-out   0.686  0.515  0.588   0.610   35/16/33/477   <= lift -0.006 vs GIT
+
+
+======================================================================
+MODEL: LogReg   (conflict-class: precision / recall / F1 / PR-AUC)
+======================================================================
+feature set         protocol             P      R     F1   PRAUC   confusion(TP/FP/FN/TN)
+GIT (baseline)      stratified-5f    0.510  0.721  0.598   0.600   49/47/19/446
+GRAPH (novelty)     stratified-5f    0.293  0.632  0.400   0.434   43/104/25/389
+ALL (git+graph)     stratified-5f    0.455  0.735  0.562   0.616   50/60/18/433
+
+GIT (baseline)      leave-repo-out   0.472  0.735  0.575   0.601   50/56/18/437
+GRAPH (novelty)     leave-repo-out   0.275  0.206  0.235   0.233   14/37/54/456
+ALL (git+graph)     leave-repo-out   0.430  0.632  0.512   0.521   43/57/25/436   <= lift -0.063 vs GIT
+
+Headline = leave-repo-out F1 of ALL minus GIT. Positive => the dependency
+graph adds signal the flat git features miss (esp. no-shared-file conflicts).
+
+DONE. If this completed, drop the leave-repo-out ALL-vs-GIT F1 / PR-AUC
+into IDF section 8 (the remaining [EDIT]).
