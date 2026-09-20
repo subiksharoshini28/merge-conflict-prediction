@@ -25,7 +25,8 @@ import numpy as np
 MODEL = "model.pkl"
 DATA = "all.csv"
 FEATURES = ["commits_p1", "commits_p2", "files_p1", "files_p2", "overlap_files",
-            "overlap_ratio", "authors_p1", "authors_p2", "churn_p1", "churn_p2"]
+            "overlap_ratio", "authors_p1", "authors_p2", "churn_p1", "churn_p2",
+            "divergence_days"]
 
 ACTION = {
     "overlap_files":  "Both branches edit the same file(s) - coordinate on them or merge the smaller branch first.",
@@ -89,13 +90,26 @@ def side(repo, base, tip):
     return int(n or 0), files, authors, ins + dels
 
 
+def _cdate(repo, sha):
+    """Unix commit timestamp of a ref (0 if unknown)."""
+    out = g(repo, "show", "-s", "--format=%ct", sha)
+    try:
+        return int(out.splitlines()[0])
+    except Exception:
+        return 0
+
+
 def feature_vector(repo, base, a, b):
     c1, f1, a1, ch1 = side(repo, base, a)
     c2, f2, a2, ch2 = side(repo, base, b)
     ov, un = f1 & f2, f1 | f2
+    # branch age: base -> newest branch tip. Leak-free and available before the merge
+    # (a, b are the un-merged branch tips), matching how the training column was built.
+    div = max(0, max(_cdate(repo, a), _cdate(repo, b)) - _cdate(repo, base)) / 86400.0
     return {"commits_p1": c1, "commits_p2": c2, "files_p1": len(f1), "files_p2": len(f2),
             "overlap_files": len(ov), "overlap_ratio": round(len(ov) / len(un), 4) if un else 0,
-            "authors_p1": a1, "authors_p2": a2, "churn_p1": ch1, "churn_p2": ch2}
+            "authors_p1": a1, "authors_p2": a2, "churn_p1": ch1, "churn_p2": ch2,
+            "divergence_days": round(div, 3)}
 
 
 def risk_band(p):
@@ -120,6 +134,33 @@ def smote_balance(X, y, k=5, seed=0):
     return np.vstack([X, np.array(out)]), np.concatenate([y, np.ones(len(out), int)])
 
 
+# ---- feature transform: IQR outlier capping + log(x+1) on skewed count features ----
+LOG_COLS = [c for c in FEATURES if c != "overlap_ratio"]
+LOG_IDX = [FEATURES.index(c) for c in LOG_COLS]
+
+
+def fit_transform_bounds(X):
+    """Learn per-feature IQR caps on the TRAINING data (stored in the model)."""
+    b = []
+    for j in range(X.shape[1]):
+        q1, q3 = np.percentile(X[:, j], 25), np.percentile(X[:, j], 75)
+        iqr = q3 - q1
+        b.append((max(0.0, q1 - 1.5 * iqr), q3 + 1.5 * iqr))
+    return b
+
+
+def apply_transform(X, bounds):
+    """Clip to the learned IQR bounds, then log(x+1) the count features."""
+    if not bounds:
+        return np.array(X, float)
+    X = np.array(X, float).copy()
+    for j, (lo, hi) in enumerate(bounds):
+        X[:, j] = np.clip(X[:, j], lo, hi)
+    for j in LOG_IDX:
+        X[:, j] = np.log1p(X[:, j])
+    return X
+
+
 # ------------------------------------------------------------------ train
 def train(data=DATA, out=MODEL):
     import pandas as pd
@@ -128,12 +169,14 @@ def train(data=DATA, out=MODEL):
     df[FEATURES] = df[FEATURES].apply(pd.to_numeric, errors="coerce").fillna(0)
     y = pd.to_numeric(df["label"], errors="coerce").fillna(0).astype(int).to_numpy()
     X = df[FEATURES].to_numpy(float)
-    Xa, ya = smote_balance(X, y)   # SMOTE augmentation (boosts conflict recall/F1)
+    bounds = fit_transform_bounds(X)          # IQR caps learned on training data
+    Xt = apply_transform(X, bounds)           # cap + log(x+1)
+    Xa, ya = smote_balance(Xt, y)             # SMOTE on the transformed features
     model = RandomForestClassifier(n_estimators=300, class_weight="balanced_subsample",
                                    min_samples_leaf=2, random_state=0, n_jobs=-1).fit(Xa, ya)
-    clean_baseline = np.median(X[y == 0], axis=0)   # baseline from REAL clean data only
-    pickle.dump({"model": model, "features": FEATURES, "clean_baseline": clean_baseline},
-                open(out, "wb"))
+    clean_baseline = np.median(Xt[y == 0], axis=0)   # baseline in TRANSFORMED space
+    pickle.dump({"model": model, "features": FEATURES, "clean_baseline": clean_baseline,
+                 "bounds": bounds}, open(out, "wb"))
     print(f"trained on {len(df)} scenarios ({int(y.sum())} conflicts) -> saved {out}")
 
 
@@ -147,13 +190,14 @@ def load_model(path=MODEL):
 def explain_vector(bundle, vec):
     """Counterfactual attribution: prob drop when each feature -> typical clean value."""
     model, feats, base = bundle["model"], bundle["features"], bundle["clean_baseline"]
-    x = np.array([vec[f] for f in feats], float)
+    xr = np.array([vec[f] for f in feats], float)                 # raw values (for display)
+    x = apply_transform(xr.reshape(1, -1), bundle.get("bounds"))[0]  # transformed (for the model)
     p = model.predict_proba(x.reshape(1, -1))[0, 1]
     drivers = []
     for i, f in enumerate(feats):
         xc = x.copy(); xc[i] = base[i]
         drop = p - model.predict_proba(xc.reshape(1, -1))[0, 1]
-        drivers.append((f, drop, x[i], base[i]))
+        drivers.append((f, drop, xr[i], base[i]))               # show RAW value
     drivers.sort(key=lambda t: t[1], reverse=True)
     return p, drivers
 
@@ -163,7 +207,7 @@ def shap_vector(bundle, vec):
     import shap
     ex = shap.TreeExplainer(bundle["model"])
     feats = bundle["features"]
-    x = np.array([[vec[f] for f in feats]], float)
+    x = apply_transform(np.array([[vec[f] for f in feats]], float), bundle.get("bounds"))
     arr = np.array(ex.shap_values(x))
     v = arr[0, :, 1] if arr.ndim == 3 and arr.shape[-1] >= 2 else (arr[0] if arr.ndim == 2 else arr)
     return [(f, float(s), float(vec[f])) for f, s in zip(feats, v)]
@@ -231,7 +275,7 @@ def demo(data=DATA):
     bundle = load_model()
     df = pd.read_csv(data)
     df[FEATURES] = df[FEATURES].apply(pd.to_numeric, errors="coerce").fillna(0)
-    X = df[FEATURES].to_numpy(float)
+    X = apply_transform(df[FEATURES].to_numpy(float), bundle.get("bounds"))
     proba = bundle["model"].predict_proba(X)[:, 1]
     idx = int(np.argmax(proba))
     row = df.iloc[idx]

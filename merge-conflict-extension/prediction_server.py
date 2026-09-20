@@ -30,15 +30,16 @@ GIT = cp.FEATURES
 
 
 def load_model():
-    """Load the trained model."""
+    """Load the trained model bundle (model + IQR/log transform bounds)."""
     if os.path.exists(MODEL_PATH):
         with open(MODEL_PATH, "rb") as f:
-            data = pickle.load(f)
-            return data["model"]
+            return pickle.load(f)
     return None
 
 
-model = load_model()
+bundle = load_model()
+model = bundle["model"] if bundle else None
+BOUNDS = bundle.get("bounds") if bundle else None
 
 
 class PredictionHandler(BaseHTTPRequestHandler):
@@ -86,13 +87,15 @@ class PredictionHandler(BaseHTTPRequestHandler):
                 features.get("authors_p2", 0),
                 features.get("churn_p1", 0),
                 features.get("churn_p2", 0),
+                features.get("divergence_days", 0),
             ]
 
             X = np.array(feature_vector).reshape(1, -1)
 
             # Predict
             if model is not None:
-                probability = float(model.predict_proba(X)[0][1])
+                Xt = cp.apply_transform(X, BOUNDS)   # same IQR-cap + log(x+1) as training
+                probability = float(model.predict_proba(Xt)[0][1])
             else:
                 # Fallback: rule-based prediction
                 probability = self.rule_based_predict(features)
@@ -184,6 +187,18 @@ class PredictionHandler(BaseHTTPRequestHandler):
         churn_a = get_churn(branch_a)
         churn_b = get_churn(branch_b)
 
+        # branch age: merge-base -> newest branch tip (leak-free, pre-merge)
+        def cdate(ref):
+            out = git_cmd(f"git show -s --format=%ct {ref}")
+            try:
+                return int(out.splitlines()[0])
+            except Exception:
+                return 0
+
+        base_ts = cdate(base)
+        tip_ts = max(cdate(branch_a), cdate(branch_b))
+        divergence_days = round(max(0, tip_ts - base_ts) / 86400.0, 3) if base_ts else 0.0
+
         return {
             "commits_p1": commits_a,
             "commits_p2": commits_b,
@@ -195,6 +210,7 @@ class PredictionHandler(BaseHTTPRequestHandler):
             "authors_p2": authors_b,
             "churn_p1": churn_a,
             "churn_p2": churn_b,
+            "divergence_days": divergence_days,
         }
 
     def rule_based_predict(self, features):

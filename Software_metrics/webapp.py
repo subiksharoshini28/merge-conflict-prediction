@@ -20,7 +20,7 @@ import conflict_predictor as cp
 import graph_features as gf
 import complexity_features as cx
 
-PORT = 8000
+PORT = int(os.environ.get("DASH_PORT", "8000"))
 # Login gate — anyone sharing this (e.g. via a tunnel) must supply these.
 BUNDLE = cp.load_model()
 DATASET = pd.read_csv(cp.DATA)
@@ -124,8 +124,11 @@ def compute_performance():
         proba = np.zeros(len(y))
         it = splitter.split(X, y, grp) if grp is not None else splitter.split(X, y)
         for tr, te in it:
-            Xa, ya = cp.smote_balance(X[tr], y[tr])   # SMOTE inside train fold only (no leakage)
-            m = rf(); m.fit(Xa, ya); proba[te] = m.predict_proba(X[te])[:, 1]
+            b = cp.fit_transform_bounds(X[tr])        # IQR caps learned on train fold only
+            Xtr = cp.apply_transform(X[tr], b)        # cap + log(x+1)
+            Xte = cp.apply_transform(X[te], b)
+            Xa, ya = cp.smote_balance(Xtr, y[tr])     # SMOTE inside train fold only (no leakage)
+            m = rf(); m.fit(Xa, ya); proba[te] = m.predict_proba(Xte)[:, 1]
         pred = (proba >= 0.5).astype(int)
         tn, fp, fn, tp = confusion_matrix(y, pred, labels=[0, 1]).ravel()
         return {"precision": round(precision_score(y, pred, zero_division=0), 3),
@@ -159,7 +162,7 @@ def shap_vec(vec):
     if _SHAP is None:
         import shap
         _SHAP = shap.TreeExplainer(BUNDLE["model"])
-    x = np.array([[vec[f] for f in cp.FEATURES]], float)
+    x = cp.apply_transform(np.array([[vec[f] for f in cp.FEATURES]], float), BUNDLE.get("bounds"))
     v = _shap_pos(_SHAP.shap_values(x))[0]
     return [{"feature": f, "value": float(vec[f]), "shap": round(float(s), 4)}
             for f, s in zip(cp.FEATURES, v)]
@@ -172,7 +175,7 @@ def shap_summary():
         return _SHAPSUM
     import shap
     ex = shap.TreeExplainer(BUNDLE["model"])
-    X = DATASET[cp.FEATURES].to_numpy(float)
+    X = cp.apply_transform(DATASET[cp.FEATURES].to_numpy(float), BUNDLE.get("bounds"))
     mean_abs = np.abs(_shap_pos(ex.shap_values(X))).mean(axis=0)
     _SHAPSUM = sorted([{"feature": f, "value": round(float(m), 4)}
                        for f, m in zip(cp.FEATURES, mean_abs)], key=lambda d: -d["value"])
